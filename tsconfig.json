@@ -15,5 +15,5 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["public/src", "server/**/*.ts"]
+  "include": ["client/src", "server/**/*.ts"]
 }

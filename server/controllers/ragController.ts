@@ -30,6 +30,14 @@ export const askQuestion = async (
     const answer = await ask(userQuestion);
     res.status(200).json({ answer });
   } catch (error) {
+    if ((error as { status?: number }).status === 429) {
+      res.status(429).json({
+        answer: '',
+        error: 'Gemini rate limit exceeded, try again shortly',
+      });
+      return;
+    }
+
     res.status(500).json({
       answer: '',
       error: 'Failed to get answer for question',

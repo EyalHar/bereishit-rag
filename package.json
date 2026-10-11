@@ -4,12 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "workspaces": [
-    "public",
+    "client",
     "server"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev -w public\" \"npm run dev -w server\"",
-    "build": "npm run build -w public && npm run build -w server",
+    "dev": "concurrently \"npm run dev -w client\" \"npm run dev -w server\"",
+    "build": "npm run build -w client && npm run build -w server",
     "start": "npm run start -w server"
   },
   "devDependencies": {

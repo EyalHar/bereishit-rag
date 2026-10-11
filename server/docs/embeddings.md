@@ -2,32 +2,26 @@
 
 ## Purpose
 
-Single, shared wrapper around the Gemini embedding API (`gemini-embedding-001`, requested at 768
-dimensions via `outputDimensionality`).
-Every place in the codebase that needs a vector for a piece of text goes through this file — so
-the exact same model/config is used everywhere, which is required for similarity search to make
-sense (query vectors and stored vectors must live in the same embedding space).
+The single wrapper around the Gemini embedding API (`gemini-embedding-001`, 768 dimensions via
+`outputDimensionality`). Every vector in the system comes from here, so stored and query vectors
+share one embedding space.
 
-## Process
+## Task types
 
-1. **Input:** either a single string, or a batch of strings (chunk contents).
-2. **Call Gemini:** send the text(s) to the Gemini embeddings endpoint requesting 768-dimension
-   output.
-3. **Rate-limit handling:** Gemini's free tier has strict per-minute quotas. Calls are made
-   sequentially (not all at once) with a small delay between them, and a retry-with-backoff on
-   `429`/rate-limit errors, so a large `loadAllData` run doesn't crash partway through.
-4. **Output:** a `number[]` (768 floats) per input string, in the same order as the input.
+Gemini supports asymmetric embeddings for retrieval:
 
-## Notes
+- `embedTexts` (chunks being stored) uses `RETRIEVAL_DOCUMENT`
+- `embedText` (the user's question) uses `RETRIEVAL_QUERY`
 
-- This is the **only** file that talks to the Gemini embeddings endpoint. If the embedding model
-  or dimension ever needs to change, this is the one place to update.
-- Errors from Gemini (bad key, quota exhausted) should propagate clearly rather than being
-  swallowed, so `loadAllData` can report a useful failure instead of silently storing `null`
-  vectors.
+This places a short question closer to the passage that answers it than the default symmetric
+mode does. Changing either task type requires re-embedding the whole table.
+
+## Rate limits
+
+Calls are sequential with a 1.5s pause, and each call retries up to 5 times with linear backoff,
+so a full `loadAllData` run survives the free tier's per-minute quota.
 
 ## Used by
 
-- `ragService.loadAllData` — embeds every chunk before inserting into `knowledge_base`.
-- `ragService.ask` — embeds the incoming user question with the *same* model, so it can be
-  compared against the stored chunk vectors.
+- `ragService.loadAllData` — embeds every new chunk.
+- `ragService.ask` — embeds the incoming question.

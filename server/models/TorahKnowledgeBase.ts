@@ -1,67 +1,89 @@
 import { Model, DataTypes, Optional } from 'sequelize';
 import sequelize from '../config/database';
 
-interface KnowledgeBaseAttributes {
+interface TorahKnowledgeBaseAttributes {
   id: number;
-  source: string;
-  source_id: string;
-  chunk_index: number;
+  book: string;
+  parasha: string | null;
+  perek_start: number;
+  pasuk_start: number;
+  perek_end: number;
+  pasuk_end: number;
+  ref: string;
   chunk_content: string;
   embeddings_768?: number[] | null;
-  embeddings_1536?: number[] | null;
   created_at?: Date;
   updated_at?: Date;
 }
 
-interface KnowledgeBaseCreationAttributes
+interface TorahKnowledgeBaseCreationAttributes
   extends Optional<
-    KnowledgeBaseAttributes,
+    TorahKnowledgeBaseAttributes,
     'id' | 'created_at' | 'updated_at'
   > {}
 
-class KnowledgeBase
-  extends Model<KnowledgeBaseAttributes, KnowledgeBaseCreationAttributes>
-  implements KnowledgeBaseAttributes
+class TorahKnowledgeBase
+  extends Model<
+    TorahKnowledgeBaseAttributes,
+    TorahKnowledgeBaseCreationAttributes
+  >
+  implements TorahKnowledgeBaseAttributes
 {
   public id!: number;
-  public source!: string;
-  public source_id!: string;
-  public chunk_index!: number;
+  public book!: string;
+  public parasha!: string | null;
+  public perek_start!: number;
+  public pasuk_start!: number;
+  public perek_end!: number;
+  public pasuk_end!: number;
+  public ref!: string;
   public chunk_content!: string;
   public embeddings_768?: number[] | null;
-  public embeddings_1536?: number[] | null;
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
 }
 
-KnowledgeBase.init(
+TorahKnowledgeBase.init(
   {
     id: {
       type: DataTypes.INTEGER,
       autoIncrement: true,
       primaryKey: true,
     },
-    source: {
+    book: {
       type: DataTypes.STRING(255),
       allowNull: false,
     },
-    source_id: {
+    parasha: {
       type: DataTypes.STRING(255),
-      allowNull: false,
+      allowNull: true,
     },
-    chunk_index: {
+    perek_start: {
       type: DataTypes.INTEGER,
       allowNull: false,
+    },
+    pasuk_start: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    perek_end: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    pasuk_end: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    ref: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+      unique: true,
     },
     chunk_content: {
       type: DataTypes.TEXT,
       allowNull: false,
     },
     embeddings_768: {
-      type: DataTypes.ARRAY(DataTypes.REAL),
-      allowNull: true,
-    },
-    embeddings_1536: {
       type: DataTypes.ARRAY(DataTypes.REAL),
       allowNull: true,
     },
@@ -78,10 +100,10 @@ KnowledgeBase.init(
   },
   {
     sequelize,
-    tableName: 'knowledge_base',
+    tableName: 'torah_knowledge_base',
     timestamps: true,
     underscored: true,
   }
 );
 
-export default KnowledgeBase;
+export default TorahKnowledgeBase;

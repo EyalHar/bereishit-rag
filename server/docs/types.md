@@ -1,32 +1,27 @@
 # `loaders/types.ts`
 
-## Purpose
-
-Shared type definitions for the loader → `ragService` handoff, so all three loaders
-(`pdfLoader`, `articleLoader`, `slackLoader`) return the exact same shape and `ragService` doesn't
-need to special-case any of them.
-
-## Contents
+Shared shapes for the loader → chunking → `ragService` handoff.
 
 ```ts
-export type DocumentSource = 'pdf' | 'article' | 'slack';
+export interface TorahVerse {
+  perek: number;
+  pasuk: number;
+  text: string;          // cleaned, unpointed
+  isSectionEnd: boolean; // verse closes a petucha/setuma
+}
 
-export interface RawDocument {
-  source: DocumentSource;
-  source_id: string;
-  text: string;
+export interface TorahChunk {
+  book: string;          // 'Genesis'
+  parasha: string | null;
+  perekStart: number;
+  pasukStart: number;
+  perekEnd: number;
+  pasukEnd: number;
+  ref: string;           // 'Genesis 1:1-1:5' — unique key in torah_knowledge_base
+  content: string;
 }
 ```
 
-- `DocumentSource` — a closed set of the 3 valid `source` values, matching what's stored in the
-  `knowledge_base.source` column.
-- `RawDocument` — one fetched-but-not-yet-chunked document: which source it came from
-  (`source`), what identifies it within that source (`source_id` — e.g. a PDF filename, an
-  article slug, a Slack channel name), and its raw extracted text (`text`).
-
-## Used by
-
-- Every loader (`pdfLoader.ts`, `articleLoader.ts`, `slackLoader.ts`) — each returns
-  `Promise<RawDocument[]>`.
-- `ragService.loadAllData` — combines the arrays from all three loaders into one list before
-  chunking.
+- `sefariaLoader` produces `TorahVerse[]`.
+- `chunking.chunkVerses` turns them into `TorahChunk[]`.
+- `ragService` stores each `TorahChunk` as one row.

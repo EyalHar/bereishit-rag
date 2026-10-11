@@ -1,4 +1,4 @@
 import sequelize, { initializeDB } from '../config/database';
-import KnowledgeBase from './KnowledgeBase';
+import TorahKnowledgeBase from './TorahKnowledgeBase';
 
-export { sequelize, initializeDB, KnowledgeBase };
+export { sequelize, initializeDB, TorahKnowledgeBase };

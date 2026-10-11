@@ -9,7 +9,7 @@ export default [
 	},
 	{
 		// Frontend (React and JSX) configuration
-		files: ['public/**/*.{ts,tsx}'], // Adjust based on frontend file location
+		files: ['client/**/*.{ts,tsx}'], // Adjust based on frontend file location
 		languageOptions: {
 			ecmaVersion: 2020,
 			globals: globals.browser, // Use browser globals

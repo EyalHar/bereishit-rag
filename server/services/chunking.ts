@@ -1,116 +1,91 @@
-const TARGET_CHUNK_WORDS = 400;
+import { TorahChunk, TorahVerse } from './loaders/types';
 
-const PAGE_MARKER_REGEX = /\n*--\s*\d+\s*of\s*\d+\s*--\n*/g;
-const BLANK_LINE_REGEX = /\n\s*\n+/;
-const SENTENCE_REGEX = /[^.!?]+[.!?]+(\s+|$)/g;
-
-const stripPageMarkers = (text: string): string =>
-  text.replace(PAGE_MARKER_REGEX, ' ');
-
-const splitIntoParagraphs = (text: string): string[] =>
-  text
-    .split(BLANK_LINE_REGEX)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean);
-
-const splitIntoSentences = (text: string): string[] => {
-  const matches = text.match(SENTENCE_REGEX);
-  if (!matches) {
-    return [text];
-  }
-
-  return matches.map((sentence) => sentence.trim()).filter(Boolean);
-};
+const MAX_CHUNK_WORDS = 400;
 
 const countWords = (text: string): number =>
   text.split(/\s+/).filter(Boolean).length;
 
-// Greedily accumulates units into ~maxWords pieces joined by `separator`,
-// filling each piece to the max before moving to the next one.
-const pack = (units: string[], maxWords: number, separator: string): string[] => {
-  const pieces: string[] = [];
-  let current = '';
-  let currentWords = 0;
+const toChunk = (
+  verses: TorahVerse[],
+  book: string,
+  parasha: string | null
+): TorahChunk => {
+  const first = verses[0];
+  const last = verses[verses.length - 1];
 
-  for (const unit of units) {
-    const unitWords = countWords(unit);
-    if (currentWords + unitWords > maxWords && current) {
-      pieces.push(current);
-      current = unit;
-      currentWords = unitWords;
-    } else {
-      current = current ? `${current}${separator}${unit}` : unit;
-      currentWords += unitWords;
-    }
-  }
-  if (current) {
-    pieces.push(current);
-  }
-
-  return pieces;
+  return {
+    book,
+    parasha,
+    perekStart: first.perek,
+    pasukStart: first.pasuk,
+    perekEnd: last.perek,
+    pasukEnd: last.pasuk,
+    ref: `${book} ${first.perek}:${first.pasuk}-${last.perek}:${last.pasuk}`,
+    content: verses.map((v) => v.text).join(' '),
+  };
 };
 
-// Distributes units into relatively even-sized pieces (target = total /
-// number-of-parts-needed) instead of greedily filling each piece to
-// maxWords before moving on — avoids a lopsided "one full piece + one small
-// leftover" split. maxWords is still a hard cap that's never crossed.
-const packBalanced = (units: string[], maxWords: number, separator: string): string[] => {
-  const wordCounts = units.map(countWords);
-  const totalWords = wordCounts.reduce((sum, count) => sum + count, 0);
-  const numParts = Math.max(1, Math.ceil(totalWords / maxWords));
+// Splits one oversized petucha/setuma section into relatively even pieces
+// capped at MAX_CHUNK_WORDS, distributed by target size rather than greedily
+// filled, and never breaking inside a verse.
+const splitOversizedSection = (verses: TorahVerse[]): TorahVerse[][] => {
+  const wordCounts = verses.map((v) => countWords(v.text));
+  const totalWords = wordCounts.reduce((sum, w) => sum + w, 0);
+  const numParts = Math.max(1, Math.ceil(totalWords / MAX_CHUNK_WORDS));
   const targetWords = Math.ceil(totalWords / numParts);
 
-  const pieces: string[] = [];
-  let current: string[] = [];
+  const parts: TorahVerse[][] = [];
+  let current: TorahVerse[] = [];
   let currentWords = 0;
 
-  units.forEach((unit, i) => {
-    const unitWords = wordCounts[i];
-    const exceedsHardCap = currentWords + unitWords > maxWords;
-    // Only the last part is allowed to absorb the remainder past the
-    // target — earlier parts close as soon as they'd overshoot it.
-    const isFillingEarlierPart = pieces.length < numParts - 1;
-    const exceedsTarget = isFillingEarlierPart && currentWords + unitWords > targetWords;
+  verses.forEach((verse, i) => {
+    const isFillingEarlierPart = parts.length < numParts - 1;
+    const exceedsTarget =
+      isFillingEarlierPart && currentWords + wordCounts[i] > targetWords;
 
-    if (current.length > 0 && (exceedsHardCap || exceedsTarget)) {
-      pieces.push(current.join(separator));
+    if (current.length > 0 && exceedsTarget) {
+      parts.push(current);
       current = [];
       currentWords = 0;
     }
 
-    current.push(unit);
-    currentWords += unitWords;
+    current.push(verse);
+    currentWords += wordCounts[i];
   });
 
   if (current.length > 0) {
-    pieces.push(current.join(separator));
+    parts.push(current);
   }
 
-  return pieces;
+  return parts;
 };
 
-// Splits one oversized paragraph into relatively even pieces, each capped
-// at maxWords, without ever cutting a sentence in half. Last-resort
-// fallback for a single sentence longer than maxWords on its own (no
-// punctuation to break on): cut at word boundaries, never mid-word.
-const splitOversizedParagraph = (paragraph: string, maxWords: number): string[] => {
-  const sentences = splitIntoSentences(paragraph).flatMap((sentence) =>
-    countWords(sentence) > maxWords
-      ? pack(sentence.split(/\s+/).filter(Boolean), maxWords, ' ')
-      : [sentence]
-  );
+export const chunkVerses = (
+  verses: TorahVerse[],
+  book: string,
+  parashaFor: (perek: number, pasuk: number) => string | null
+): TorahChunk[] => {
+  const sections: TorahVerse[][] = [];
+  let current: TorahVerse[] = [];
 
-  return packBalanced(sentences, maxWords, ' ');
-};
+  for (const verse of verses) {
+    current.push(verse);
+    if (verse.isSectionEnd) {
+      sections.push(current);
+      current = [];
+    }
+  }
+  if (current.length > 0) {
+    sections.push(current);
+  }
 
-export const chunkText = (text: string): string[] => {
-  const paragraphs = splitIntoParagraphs(stripPageMarkers(text));
-
-  const units = paragraphs.flatMap((paragraph) =>
-    countWords(paragraph) > TARGET_CHUNK_WORDS
-      ? splitOversizedParagraph(paragraph, TARGET_CHUNK_WORDS)
-      : [paragraph]
-  );
-
-  return pack(units, TARGET_CHUNK_WORDS, '\n\n');
+  return sections
+    .flatMap((section) =>
+      countWords(section.map((v) => v.text).join(' ')) > MAX_CHUNK_WORDS
+        ? splitOversizedSection(section)
+        : [section]
+    )
+    .map((section) =>
+      toChunk(section, book, parashaFor(section[0].perek, section[0].pasuk))
+    );
 };
